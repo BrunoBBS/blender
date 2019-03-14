@@ -62,6 +62,103 @@
 
 static void txt_screen_clamp(SpaceText *st, ARegion *ar);
 
+
+/************************ util ***************************/
+
+/**
+ * This function converts the indentation tabs from a buffer to spaces.
+ * \param buf: A reference to a cstring.
+ * \param tab_size: The size, in spaces, of the tab character.
+ * \param free_src: Whether to free memory of the source buffer
+ *          - Pointer will still be overwritten if false.
+ */
+static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
+{
+	bool line_start = true;
+	int i = 0, j = 0;
+	uint n_tabs = 0;
+	char *ret_buf = NULL;
+
+	/* Get the number of tab characters in buffer */
+	while((*buf)[i]) {
+		/* Verify if is an indentation whitespace character */
+		if ((*buf)[i] == '\n')
+			line_start = true;
+		else if ((*buf)[i] != '\t' && (*buf)[i] != ' ')
+			line_start = false;
+
+		if ((*buf)[i] == '\t' && line_start)
+			n_tabs++;
+		i++;
+	}
+
+	ret_buf = MEM_mallocN(i + n_tabs * (tab_size - 1), __func__);
+	i = 0;
+
+	line_start = true;
+	while((*buf)[i]) {
+		/* Verify if is an indentation whitespace character */
+		if ((*buf)[i] == '\n')
+			line_start = true;
+		else if ((*buf)[i] != '\t' && (*buf)[i] != ' ')
+			line_start = false;
+
+		if ((*buf)[i] == '\t' && line_start) {
+			for (int k = 0; k < tab_size; k++)
+				ret_buf[j++] = ' ';
+		}
+		else {
+			ret_buf[j++] = (*buf)[i];
+		}
+		i++;
+	}
+	ret_buf[j] = '\0';
+
+	if (free_src) MEM_freeN(*buf);
+	*buf = ret_buf;
+}
+
+/**
+ * This function converts the indentation spaces from a buffer to tabs.
+ * \param buf: A reference to a cstring.
+ * \param tab_size: The size, in spaces, of the tab character.
+ */
+static void buf_spaces_to_tabs(char **buf, size_t tab_size)
+{
+
+	bool line_start = true;
+	int i = 0, j = 0;
+	int spc_count = 0;
+	char *ret_buf;
+
+	ret_buf = *buf;
+
+	while((*buf)[i]) {
+		/* Verify if is an indentation whitespace character */
+		if ((*buf)[i] == '\n')
+			line_start = true;
+		else if ((*buf)[i] != '\t' && (*buf)[i] != ' ')
+			line_start = false;
+
+		if ((*buf)[i] == ' ' && line_start) {
+			spc_count++;
+			if (spc_count == tab_size) {
+				ret_buf[j++] = '\t';
+				spc_count = 0;
+			}
+		}
+		else {
+			for (; spc_count > 0; spc_count--) {
+				ret_buf[j++] = ' ';
+			}
+			ret_buf[j++] = (*buf)[i];
+		}
+		i++;
+	}
+	ret_buf[j] = '\0';
+	*buf = ret_buf;
+}
+
 /************************ poll ***************************/
 
 
@@ -712,12 +809,16 @@ void TEXT_OT_refresh_pyconstraints(wmOperatorType *ot)
 
 /******************* paste operator *********************/
 
+/**
+ * Callback function called for the paste action
+ */
 static int text_paste_exec(bContext *C, wmOperator *op)
 {
 	const bool selection = RNA_boolean_get(op->ptr, "selection");
 	Text *text = CTX_data_edit_text(C);
 	char *buf;
 	int buf_len;
+	bool tabs_to_spaces = text->flags & TXT_TABSTOSPACES;
 
 	buf = WM_clipboard_text_get(selection, &buf_len);
 
@@ -727,6 +828,12 @@ static int text_paste_exec(bContext *C, wmOperator *op)
 	text_drawcache_tag_update(CTX_wm_space_text(C), 0);
 
 	TextUndoBuf *utxt = ED_text_undo_push_init(C);
+
+	/* Convert clipboard content indentation according to configuration */
+	buf_tabs_to_spaces(&buf, TXT_TABSIZE, true);
+	if (!tabs_to_spaces)
+		buf_spaces_to_tabs(&buf, TXT_TABSIZE);
+
 	txt_insert_buf(text, utxt, buf);
 	text_update_edited(text);
 
