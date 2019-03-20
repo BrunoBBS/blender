@@ -66,8 +66,22 @@ static void txt_screen_clamp(SpaceText *st, ARegion *ar);
 /************************ util ***************************/
 
 /**
+ * Updates state of line_start flag if the given character
+ * represents a start of a new line or the indentation part of a line.
+ * \param c: The current line character.
+ * \param last_state: The last state of "is indentation".
+ */
+inline static void chk_line_start(char c, bool *last_state)
+{
+	if (c == '\n')
+		*last_state = true;
+	else if (c != '\t' && c != ' ')
+		*last_state = false;
+}
+
+/**
  * This function converts the indentation tabs from a buffer to spaces.
- * \param buf: A reference to a cstring.
+ * \param buf: A pointer to a cstring.
  * \param tab_size: The size, in spaces, of the tab character.
  * \param free_src: Whether to free memory of the source buffer
  *          - Pointer will still be overwritten if false.
@@ -76,86 +90,51 @@ static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
 {
 	bool line_start = true;
 	int i = 0, j = 0;
-	uint n_tabs = 0;
+	uint n_tabs = 0, spc_count = 0, n_spaces = 0;
 	char *ret_buf = NULL;
 
 	/* Get the number of tab characters in buffer */
-	while((*buf)[i]) {
+	for (i = 0; (*buf)[i]; i++) {
 		/* Verify if is an indentation whitespace character */
-		if ((*buf)[i] == '\n')
-			line_start = true;
-		else if ((*buf)[i] != '\t' && (*buf)[i] != ' ')
-			line_start = false;
+		 chk_line_start((*buf)[i], &line_start);
 
 		if ((*buf)[i] == '\t' && line_start)
 			n_tabs++;
-		i++;
 	}
 
 	ret_buf = MEM_mallocN(i + n_tabs * (tab_size - 1), __func__);
-	i = 0;
 
+	int spaces_until_tab = 0;
 	line_start = true;
-	while((*buf)[i]) {
+	for (i = 0; (*buf)[i]; i++) {
 		/* Verify if is an indentation whitespace character */
-		if ((*buf)[i] == '\n')
-			line_start = true;
-		else if ((*buf)[i] != '\t' && (*buf)[i] != ' ')
-			line_start = false;
-
-		if ((*buf)[i] == '\t' && line_start) {
-			for (int k = 0; k < tab_size; k++)
+		chk_line_start((*buf)[i], &line_start);
+		if (line_start) {
+			if ((*buf)[i] == ' ') {
+				spaces_until_tab ++;
 				ret_buf[j++] = ' ';
+			}
+			else if ((*buf)[i] == '\t') {
+				/* Calculate tab size so it fills until next indentation */
+				spaces_until_tab = spaces_until_tab % tab_size;
+				n_spaces = tab_size - spaces_until_tab;
+				spaces_until_tab = 0;
+
+				/* Write to buffer */
+				memset(&ret_buf[j], ' ', n_spaces);
+				j += n_spaces;
+			}
+			else {
+				ret_buf[j++] = '\n';
+			}
 		}
-		else {
+		if (!line_start) {
 			ret_buf[j++] = (*buf)[i];
 		}
-		i++;
 	}
 	ret_buf[j] = '\0';
 
 	if (free_src) MEM_freeN(*buf);
-	*buf = ret_buf;
-}
-
-/**
- * This function converts the indentation spaces from a buffer to tabs.
- * \param buf: A reference to a cstring.
- * \param tab_size: The size, in spaces, of the tab character.
- */
-static void buf_spaces_to_tabs(char **buf, size_t tab_size)
-{
-
-	bool line_start = true;
-	int i = 0, j = 0;
-	int spc_count = 0;
-	char *ret_buf;
-
-	ret_buf = *buf;
-
-	while((*buf)[i]) {
-		/* Verify if is an indentation whitespace character */
-		if ((*buf)[i] == '\n')
-			line_start = true;
-		else if ((*buf)[i] != '\t' && (*buf)[i] != ' ')
-			line_start = false;
-
-		if ((*buf)[i] == ' ' && line_start) {
-			spc_count++;
-			if (spc_count == tab_size) {
-				ret_buf[j++] = '\t';
-				spc_count = 0;
-			}
-		}
-		else {
-			for (; spc_count > 0; spc_count--) {
-				ret_buf[j++] = ' ';
-			}
-			ret_buf[j++] = (*buf)[i];
-		}
-		i++;
-	}
-	ret_buf[j] = '\0';
 	*buf = ret_buf;
 }
 
@@ -818,7 +797,6 @@ static int text_paste_exec(bContext *C, wmOperator *op)
 	Text *text = CTX_data_edit_text(C);
 	char *buf;
 	int buf_len;
-	bool tabs_to_spaces = text->flags & TXT_TABSTOSPACES;
 
 	buf = WM_clipboard_text_get(selection, &buf_len);
 
@@ -829,10 +807,9 @@ static int text_paste_exec(bContext *C, wmOperator *op)
 
 	TextUndoBuf *utxt = ED_text_undo_push_init(C);
 
-	/* Convert clipboard content indentation according to configuration */
-	buf_tabs_to_spaces(&buf, TXT_TABSIZE, true);
-	if (!tabs_to_spaces)
-		buf_spaces_to_tabs(&buf, TXT_TABSIZE);
+	/* Convert clipboard content indentation to spaces if specified */
+	if (text->flags & TXT_TABSTOSPACES)
+		buf_tabs_to_spaces(&buf, TXT_TABSIZE, true);
 
 	txt_insert_buf(text, utxt, buf);
 	text_update_edited(text);
