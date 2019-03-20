@@ -90,7 +90,8 @@ static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
 {
 	bool line_start = true;
 	int i = 0, j = 0;
-	uint n_tabs = 0, spc_count = 0, n_spaces = 0;
+	uint n_tabs = 0, n_spaces = 0;
+	int spaces_until_tab = 0;
 	char *ret_buf = NULL;
 
 	/* Get the number of tab characters in buffer */
@@ -104,7 +105,6 @@ static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
 
 	ret_buf = MEM_mallocN(i + n_tabs * (tab_size - 1), __func__);
 
-	int spaces_until_tab = 0;
 	line_start = true;
 	for (i = 0; (*buf)[i]; i++) {
 		/* Verify if is an indentation whitespace character */
