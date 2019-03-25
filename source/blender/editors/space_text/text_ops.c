@@ -71,12 +71,12 @@ static void txt_screen_clamp(SpaceText *st, ARegion *ar);
  * \param c: The current line character.
  * \param last_state: A pointer to the line_start flag.
  */
-inline static void chk_line_start(char c, bool *last_state)
+inline static void chk_line_start(char c, bool *r_last_state)
 {
 	if (c == '\n')
-		*last_state = true;
+		*r_last_state = true;
 	else if (c != '\t' && c != ' ')
-		*last_state = false;
+		*r_last_state = false;
 }
 
 /**
@@ -128,7 +128,7 @@ static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
 				ret_buf[j++] = '\n';
 			}
 		}
-		if (!line_start) {
+		else {
 			ret_buf[j++] = (*buf)[i];
 		}
 	}
