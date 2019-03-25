@@ -69,7 +69,7 @@ static void txt_screen_clamp(SpaceText *st, ARegion *ar);
  * Updates state of line_start flag if the given character
  * represents a start of a new line or the indentation part of a line.
  * \param c: The current line character.
- * \param last_state: A pointer to the line_start flag that will be modified.
+ * \param last_state: A pointer to the line_start. The flag may be modified.
  */
 inline static void chk_line_start(char c, bool *r_last_state)
 {
