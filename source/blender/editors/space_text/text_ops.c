@@ -83,10 +83,8 @@ inline static void chk_line_start(char c, bool *r_last_state)
  * This function converts the indentation tabs from a buffer to spaces.
  * \param buf: A pointer to a cstring.
  * \param tab_size: The size, in spaces, of the tab character.
- * \param free_src: Whether to free memory of the source buffer
- *          - Pointer will still be overwritten if false.
  */
-static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
+static void buf_tabs_to_spaces(char **buf, size_t tab_size)
 {
 	bool line_start = true;
 	int i = 0, j = 0;
@@ -134,7 +132,7 @@ static void buf_tabs_to_spaces(char **buf, size_t tab_size, bool free_src)
 	}
 	ret_buf[j] = '\0';
 
-	if (free_src) MEM_freeN(*buf);
+	MEM_freeN(*buf);
 	*buf = ret_buf;
 }
 
@@ -809,7 +807,7 @@ static int text_paste_exec(bContext *C, wmOperator *op)
 
 	/* Convert clipboard content indentation to spaces if specified */
 	if (text->flags & TXT_TABSTOSPACES)
-		buf_tabs_to_spaces(&buf, TXT_TABSIZE, true);
+		buf_tabs_to_spaces(&buf, TXT_TABSIZE);
 
 	txt_insert_buf(text, utxt, buf);
 	text_update_edited(text);
