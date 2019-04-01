@@ -4791,7 +4791,7 @@ static bool ui_numedit_but_SLI(
 	bool changed = false;
 	float mx_fl, my_fl;
 	/* note, 'offs' is really from the widget drawing rounded corners see 'widget_numslider' */
-	float offs;
+	float offs = 0.0f;
 
 	/* prevent unwanted drag adjustments, test motion so modifier keys refresh. */
 	if ((but->type != UI_BTYPE_SCROLL) &&
@@ -4809,13 +4809,11 @@ static bool ui_numedit_but_SLI(
 	ui_mouse_scale_warp(data, mx, mx, &mx_fl, &my_fl, shift);
 
 	if (but->type == UI_BTYPE_NUM_SLIDER) {
-		offs = (BLI_rctf_size_y(&but->rect) / 2.0f);
-		deler = BLI_rctf_size_x(&but->rect) - offs;
+		deler = BLI_rctf_size_x(&but->rect);
 	}
 	else if (but->type == UI_BTYPE_SCROLL) {
 		const float size = (is_horizontal) ? BLI_rctf_size_x(&but->rect) : -BLI_rctf_size_y(&but->rect);
 		deler = size * (but->softmax - but->softmin) / (but->softmax - but->softmin + but->a1);
-		offs = 0.0;
 	}
 	else {
 		offs = (BLI_rctf_size_y(&but->rect) / 2.0f);
@@ -4831,11 +4829,11 @@ static bool ui_numedit_but_SLI(
 	if (ui_but_is_cursor_warp(but)) {
 		/* OK but can go outside bounds */
 		if (is_horizontal) {
-			data->ungrab_mval[0] = (but->rect.xmin + offs) + (f * deler);
+			data->ungrab_mval[0] = but->rect.xmin + (f * deler);
 			data->ungrab_mval[1] = BLI_rctf_cent_y(&but->rect);
 		}
 		else {
-			data->ungrab_mval[1] = (but->rect.ymin + offs) + (f * deler);
+			data->ungrab_mval[1] = but->rect.ymin + (f * deler);
 			data->ungrab_mval[0] = BLI_rctf_cent_x(&but->rect);
 		}
 		BLI_rctf_clamp_pt_v(&but->rect, data->ungrab_mval);
