@@ -194,7 +194,6 @@ static void ui_update_color_picker_buts_rgb(uiBut *from_but,
     else if (STREQ(bt->str, "Hex: ")) {
       float rgb_hex[3];
       uchar rgb_hex_uchar[3];
-      double intpart;
       char col[16];
 
       /* Hex code is assumed to be in sRGB space
@@ -204,20 +203,23 @@ static void ui_update_color_picker_buts_rgb(uiBut *from_but,
         IMB_colormanagement_scene_linear_to_srgb_v3(rgb_hex);
       }
 
-      if (rgb_hex[0] > 1.0f) {
-        rgb_hex[0] = modf(rgb_hex[0], &intpart);
-      }
-      if (rgb_hex[1] > 1.0f) {
-        rgb_hex[1] = modf(rgb_hex[1], &intpart);
-      }
-      if (rgb_hex[2] > 1.0f) {
-        rgb_hex[2] = modf(rgb_hex[2], &intpart);
-      }
+      CLAMP3(rgb_hex, 0, 1);
 
       rgb_float_to_uchar(rgb_hex_uchar, rgb_hex);
       BLI_snprintf(col, sizeof(col), "%02X%02X%02X", UNPACK3_EX((uint), rgb_hex_uchar, ));
 
       strcpy(bt->poin, col);
+
+      /* Hex can't represent rgb values greater than 1, so even if we display
+       * the value, we block editing so the resulting clamped color won't be
+       * accidentally applied */
+      if (rgb[0] > 1 || rgb[1] > 1 || rgb[2] > 1) {
+        bt->flag |= UI_BUT_DISABLED;
+        bt->disabled_info = "HEX can't represent the current RGB value";
+      }
+      else {
+        bt->flag &= ~UI_BUT_DISABLED;
+      }
     }
     else if (bt->str[1] == ' ') {
       if (bt->str[0] == 'R') {
@@ -796,6 +798,19 @@ static void ui_block_colorpicker(uiBlock *block, uiBut *from_but, float rgba[4],
                 0,
                 0,
                 TIP_("Hex triplet for color (#RRGGBB)"));
+
+
+  /* Hex can't represent rgb values greater than 1, so even if we display
+    * the value, we block editing so the resulting clamped color won't be
+    * accidentally applied */
+  if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1) {
+    bt->flag |= UI_BUT_DISABLED;
+    bt->disabled_info = "HEX can't represent the current RGB value";
+  }
+  else {
+    bt->flag &= ~UI_BUT_DISABLED;
+  }
+
   UI_but_flag_disable(bt, UI_BUT_UNDO);
   UI_but_func_set(bt, ui_colorpicker_hex_rna_cb, bt, hexcol);
   bt->custom_data = cpicker;
